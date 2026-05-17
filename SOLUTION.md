@@ -56,7 +56,9 @@ from another Terraform project/account). Used in `setup-state-backend.sh`:
 ```
 create an s3 state bucket equivalent to terragrunt s3 bucket, using s3 lockfile, not dynamodb, using the aws cli in a shell script.
 use an account regional namespaced bucket.
-aws encryption, versioning enabled
+aws encryption, versioning enabled.
+
+ensure the setup-state-backend.sh has basic idempotency
 ```
 
 Creating a skeleton application for exposing the health endpoint

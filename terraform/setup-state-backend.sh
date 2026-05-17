@@ -5,14 +5,27 @@ ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 REGION=eu-west-1
 # Create the bucket namespaced to the account and region
 # Must follow the format bucket-name-prefix-accountId-region-an for account-regional buckets
-BUCKET=tfstate-neal-street-${ACCOUNT_ID}-${REGION}-an
+BUCKET_NAME=tfstate-neal-street-${ACCOUNT_ID}-${REGION}-an
 
-# Create the state bucket
-aws s3api create-bucket \
-  --bucket $BUCKET \
-  --bucket-namespace account-regional \
-  --region $REGION \
-  --create-bucket-configuration LocationConstraint=$REGION
+if aws s3api head-bucket --bucket "${BUCKET_NAME}" --region "${REGION}" >/dev/null 2>&1; then
+  echo "State bucket already exists: ${BUCKET_NAME}"
+else
+  echo "Creating state bucket: ${BUCKET_NAME}"
+  create_bucket_output="$(
+    aws s3api create-bucket \
+      --bucket "${BUCKET_NAME}" \
+      --bucket-namespace account-regional \
+      --region "${REGION}" \
+      --create-bucket-configuration "LocationConstraint=${REGION}" 2>&1
+  )" || {
+    if [[ "${create_bucket_output}" == *BucketAlreadyOwnedByYou* ]]; then
+      echo "State bucket already exists: ${BUCKET_NAME}"
+    else
+      printf '%s\n' "${create_bucket_output}" >&2
+      exit 1
+    fi
+  }
+fi
 
 aws s3api put-public-access-block \
   --bucket "${BUCKET_NAME}" \
@@ -68,3 +81,5 @@ aws s3api put-bucket-policy \
       }
     ]
   }"
+
+echo "Finished creating the terraform state bucket."
