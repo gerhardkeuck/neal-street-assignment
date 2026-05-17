@@ -21,11 +21,34 @@ The AWS account is manually provisioned with:
 
 - An S3 bucket for Terraform state, versioning enabled, default encryption enabled, public access blocked.
 - An IAM role/user for local or CI Terraform execution.
-- A manually created SSM SecureString parameter for the app secret, for example `/rewards/dev/APP_SECRET`.
+- A manually created Secrets Manager secret for the app secret, for example `/dev/rewards/config`.
 
-The majority of the terraform operations are executed using Github Actions, though the initial account and minial state and access must be beforehand.
 
-Setup required permissions for accessing state bucket ([S3 Bucket Permissions](https://developer.hashicorp.com/terraform/language/backend/s3#s3-bucket-permissions))
+Even though the majority of the Terraform operations are executed using Github Actions, the initial account and minial state and access related resources must be created beforehand. The following scripts collects the minimal required access:
+
+
+```shell
+cd terraform
+./setup-state-backend.sh
+./setup-ci-access-role.sh
+./create-example-secret.sh
+```
+
+> ⚠️ Take care to ensure the current AWS context is for the correct account.
+> 
+> Verify with `aws sts get-caller-identity`
+
+### Run terraform locally
+
+```bash
+cd terraform/live
+terraform init
+terraform workspace select dev || terraform workspace new dev
+terraform fmt -recursive
+terraform validate
+terraform plan -var-file=../envs/dev.tfvars
+terraform apply -var-file=../envs/dev.tfvars
+```
 
 
 **Create state bucket**
