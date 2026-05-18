@@ -16,18 +16,14 @@ module "security" {
   app_port    = var.app_port
 }
 
-# Role for EC2 instnaces profile
-# TODO add additional assume role
-# TODO test assume role by allowing local role to assume the GHA role (in management)
 module "iam" {
   source = "../modules/iam"
 
-  name_prefix               = local.name_prefix
-  app_secret_parameter_name = local.secret_name
-  github_actions_role_name  = local.github_actions_role_name
-  ansible_ssm_bucket_name   = var.ansible_ssm_bucket_name
+  name_prefix              = local.name_prefix
+  app_secret_name_prefix   = local.secret_name_prefix
+  github_actions_role_name = local.github_actions_role_name
+  ansible_ssm_bucket_name  = var.ansible_ssm_bucket_name
 }
-
 
 module "loadbalancer" {
   source            = "../modules/loadbalancer"
@@ -37,7 +33,6 @@ module "loadbalancer" {
   health_path       = var.health_path
   vpc_id            = module.network.vpc_id
 }
-
 
 module "compute" {
   source = "../modules/compute"

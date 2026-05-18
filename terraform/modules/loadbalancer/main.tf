@@ -1,7 +1,7 @@
 resource "aws_lb" "this" {
   name            = "${var.name_prefix}-nlb"
   internal        = false
-  ip_address_type = "dualstack"
+  ip_address_type = "ipv4"
   # Note using NLB to allow single AZ deployment, see https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_CreateLoadBalancer.html
   load_balancer_type = "network"
   subnets            = var.public_subnet_ids

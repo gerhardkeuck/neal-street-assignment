@@ -98,7 +98,7 @@ The solution accounts for dynamic EC2 instances in the inventory (at the time of
 using the Ansible AWS dynamic inventory plugin. Access is managed throuhg AWS SSM and appropriately scoped least
 privilege
 
-The instances for the relevant service and environment is scoped and the
+Private subnets reach the SSM service via a single NAT gateway; an S3 gateway endpoint keeps Ansible's SSM file transfer off the NAT (free, in-VPC).
 
 **CI/CI configuration**
 
@@ -145,6 +145,7 @@ be a 502.
 - Separate Github assume roles for production deploys. Scope OIDC access to main branch on git repo.
 - Application distributed, even though this was mostly out of scope, would be managed with private repos. For example
   private Github repo, S3 for artifacts, containers in ECR.
+- Use multi AZ NAT gateway.
 
 ## Improvements
 
@@ -169,13 +170,6 @@ use an account regional namespaced bucket.
 aws encryption, versioning enabled.
 
 ensure the setup-state-backend.sh has basic idempotency
-```
-
-Add IPv6 support on VPC to be able to use IPv6 internet eggress on EC2 instance, to avoid requirement for NAT gateway (
-to reduce costs, on a demo example, the NAT Gateway is x10 the cost of the single EC2 instance).
-
-```
-add support for ipv6 ips on this vpc. add dns64, ensure ipv4 endpoints are still resolveable.
 ```
 
 ```
@@ -222,13 +216,6 @@ are separate roles neede between github actions applying terraform and running a
 update the modules to reflect that. also ensure the management module has sufficiently loose permissions to manage the env/dev path
 ```
 
-Debug dualstack configuration between NLB and EC2 instances:
-
-```
-given the network/vpc setup uses dualstack, review the terraform compute and loadbalancer modules if there should be any config adjustments to account for dualstack networking. the requirement is that the app instances can make networking
-  calls over ipv6, support ssm connections
-```
-
 Triage using Ansible dynamic inventory for EC2 deployments. It seems like the correct approach, though will not ensure
 instances are up to date during churn:
 
@@ -247,7 +234,7 @@ Review missing steps:
 ```
 create a dependency diagram to guide the implementation sequence of this project (task dependencies):
 - minimal go app that builds with gha on main, tests on PRs, create public gh releases
-- vpc, network routes, dualstack ipv6, support internet ipv6 egress from ec2 machines
+- vpc, network routes, NAT gateway for private subnet internet egress from ec2 machines
 - the ec2 instances with asg, managed instance group
 - network loadbalancer, nlb
 - security groups, between nlb and ec2, public ingress to nlb

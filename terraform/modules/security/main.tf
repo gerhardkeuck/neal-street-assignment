@@ -1,26 +1,24 @@
-resource "aws_security_group" "alb" {
-  name        = "${var.name_prefix}-alb-sg"
+resource "aws_security_group" "nlb" {
+  name        = "${var.name_prefix}-nlb-sg"
   description = "Public HTTP entrypoint"
   vpc_id      = var.vpc_id
 
   ingress {
-    description      = "HTTP from internet for assignment health endpoint"
-    from_port        = 80
-    to_port          = 80
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+    description = "HTTP from internet for assignment health endpoint"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = { Name = "${var.name_prefix}-alb-sg" }
+  tags = { Name = "${var.name_prefix}-nlb-sg" }
 }
 
 resource "aws_security_group" "app" {
@@ -29,20 +27,19 @@ resource "aws_security_group" "app" {
   vpc_id      = var.vpc_id
 
   ingress {
-    description     = "App traffic from ALB only"
+    description     = "App traffic from NLB only"
     from_port       = var.app_port
     to_port         = var.app_port
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
+    security_groups = [aws_security_group.nlb.id]
   }
 
   egress {
-    description      = "HTTPS to VPC endpoints and AWS APIs"
-    from_port        = 443
-    to_port          = 443
-    protocol         = "tcp"
-    cidr_blocks      = ["0.0.0.0/0"]
-    ipv6_cidr_blocks = ["::/0"]
+    description = "HTTPS to AWS APIs (SSM, CloudWatch) via NAT"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = { Name = "${var.name_prefix}-app-sg" }

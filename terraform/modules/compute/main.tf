@@ -7,7 +7,12 @@ resource "aws_launch_template" "app" {
     name = var.instance_profile_name
   }
 
-  vpc_security_group_ids = [var.app_security_group_id]
+  network_interfaces {
+    associate_public_ip_address = false
+    delete_on_termination       = true
+    device_index                = 0
+    security_groups             = [var.app_security_group_id]
+  }
 
   metadata_options {
     http_endpoint               = "enabled"
@@ -64,9 +69,8 @@ resource "aws_autoscaling_group" "app" {
     preferences {
       min_healthy_percentage = 100
       max_healthy_percentage = 200
-      instance_warmup        = 120
+      instance_warmup        = 150
     }
-    triggers = ["launch_template"]
   }
   tag {
     key                 = "Name"
