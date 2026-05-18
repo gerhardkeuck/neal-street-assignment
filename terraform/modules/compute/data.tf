@@ -8,7 +8,8 @@ data "aws_ami" "al2023" {
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-kernel-6.1-${one(data.aws_ec2_instance_type.app.supported_architectures)}"]
+    # Exclude "al2023-ami-minimal-*", which lacks amazon-ssm-agent.
+    values = ["al2023-ami-2023*-kernel-6.1-${one(data.aws_ec2_instance_type.app.supported_architectures)}"]
   }
 
   filter {

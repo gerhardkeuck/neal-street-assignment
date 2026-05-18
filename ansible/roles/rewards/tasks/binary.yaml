@@ -1,0 +1,14 @@
+---
+# get_url runs on the target host, so the binary is fetched from the instance
+# (egress is via the NAT gateway provisioned by Terraform). Use `force: true`
+# so a re-deploy overwrites the binary even if the URL is unchanged.
+- name: Download release binary
+  ansible.builtin.get_url:
+    url: "{{ rewards_binary_url }}"
+    dest: "{{ rewards_binary_path }}"
+    checksum: "{{ rewards_binary_checksum | default(omit, true) }}"
+    owner: root
+    group: root
+    mode: "0755"
+    force: true
+  notify: rewards_restart

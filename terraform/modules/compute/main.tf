@@ -34,9 +34,9 @@ resource "aws_launch_template" "app" {
     resource_type = "instance"
     tags = {
       Name        = "${var.name_prefix}-app"
-      Role        = "web"
-      Service     = var.service
-      Environment = var.environment
+      role        = "web"
+      service     = var.service
+      environment = var.environment
     }
   }
 
@@ -56,12 +56,14 @@ resource "aws_autoscaling_group" "app" {
   min_size            = var.min_size
   max_size            = var.max_size
   desired_capacity    = var.desired_capacity
-  health_check_type   = "ELB"
+  health_check_type   = "EC2"
   target_group_arns   = [var.target_group_arn]
 
   launch_template {
     id      = aws_launch_template.app.id
-    version = "$Latest"
+    # Pin to the resolved version so launch template changes produce a diff
+    # on the ASG, which is what triggers instance_refresh.
+    version = aws_launch_template.app.latest_version
   }
 
   instance_refresh {
@@ -79,19 +81,19 @@ resource "aws_autoscaling_group" "app" {
   }
 
   tag {
-    key                 = "Role"
+    key                 = "role"
     value               = "web"
     propagate_at_launch = true
   }
 
   tag {
-    key                 = "Service"
+    key                 = "service"
     value               = var.service
     propagate_at_launch = true
   }
 
   tag {
-    key                 = "Environment"
+    key                 = "environment"
     value               = var.environment
     propagate_at_launch = true
   }

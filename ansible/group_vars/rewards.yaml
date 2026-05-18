@@ -1,0 +1,10 @@
+---
+# Variables common to every rewards instance (any env).
+# Env-specific values come from instance tags via inventory `compose:`:
+#   rewards_environment, rewards_service
+# rewards_secret_name defaults from those.
+# rewards_binary_url is supplied at deploy time (CI passes --extra-vars).
+
+rewards_app_port: 8080
+rewards_install_cloudwatch_agent: false
+rewards_configure_firewall: false

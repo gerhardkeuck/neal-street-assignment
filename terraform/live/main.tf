@@ -22,7 +22,7 @@ module "iam" {
   name_prefix              = local.name_prefix
   app_secret_name_prefix   = local.secret_name_prefix
   github_actions_role_name = local.github_actions_role_name
-  ansible_ssm_bucket_name  = var.ansible_ssm_bucket_name
+  ansible_ssm_bucket_name  = aws_s3_bucket.ansible_ssm.id
 }
 
 module "loadbalancer" {
@@ -48,4 +48,14 @@ module "compute" {
   desired_capacity      = var.desired_capacity
   min_size              = var.min_size
   max_size              = var.max_size
+}
+
+module "observability" {
+  source = "../modules/observability"
+
+  name_prefix             = local.name_prefix
+  nlb_arn_suffix          = module.loadbalancer.nlb_arn_suffix
+  target_group_arn_suffix = module.loadbalancer.target_group_arn_suffix
+  asg_name                = module.compute.asg_name
+  alarm_email             = var.alarm_email
 }

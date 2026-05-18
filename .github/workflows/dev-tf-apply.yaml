@@ -7,7 +7,7 @@ on:
     - 'terraform/env/**'
     - 'terraform/live/**'
     - 'terraform/modules/**'
-    - 'dev-tf-apply.yaml'
+    - '.github/workflows/dev-tf-apply.yaml'
 
 permissions:
   contents: read
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: dev
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ vars.AWS_ROLE_ARN }}

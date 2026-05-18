@@ -1,0 +1,38 @@
+---
+# Env/service typically arrive from inventory `compose:` (instance tags).
+# Defaults here keep the role runnable in isolation (e.g. molecule/local tests).
+rewards_environment: dev
+rewards_service: rewards
+
+rewards_user: rewards
+rewards_group: rewards
+rewards_install_dir: /opt/rewards
+rewards_config_dir: /etc/rewards
+rewards_log_dir: /var/log/rewards
+
+rewards_binary_name: rewards
+rewards_binary_path: "{{ rewards_install_dir }}/{{ rewards_binary_name }}"
+rewards_env_file: "{{ rewards_config_dir }}/rewards.env"
+rewards_service_name: rewards
+rewards_app_port: 8080
+
+# Release artifact. Required — pass via group_vars, inventory, or extra-vars.
+# Example: https://github.com/<org>/<repo>/releases/download/v1.2.3/rewards-linux-arm64
+rewards_binary_url: ""
+rewards_binary_checksum: ""   # optional, e.g. "sha256:abc..."
+
+# Commit hash surfaced by the app's health endpoint. Pass via --extra-vars or CI.
+rewards_commit_hash: ""
+
+# Secrets Manager secret holding a JSON document with at least the APP_SECRET key.
+# Defaults follow the layout produced by terraform/create-example-secret.sh.
+rewards_secret_name: "/{{ rewards_environment }}/{{ rewards_service }}/config"
+rewards_secret_app_key: APP_SECRET
+
+# Arbitrary extra KEY=VALUE pairs rendered into the env file.
+rewards_extra_env: {}
+
+# Optional features.
+rewards_install_cloudwatch_agent: false
+rewards_configure_firewall: false
+rewards_firewall_allowed_cidrs: []   # e.g. ["10.60.0.0/16"]

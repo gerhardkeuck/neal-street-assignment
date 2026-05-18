@@ -52,6 +52,32 @@ resource "aws_iam_role_policy_attachment" "app_secret" {
   policy_arn = aws_iam_policy.app_secret.arn
 }
 
+data "aws_iam_policy_document" "ansible_ssm_bucket" {
+  statement {
+    sid       = "ListAnsibleSsmTransferBucket"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket"]
+    resources = ["arn:aws:s3:::${var.ansible_ssm_bucket_name}"]
+  }
+
+  statement {
+    sid    = "UseAnsibleSsmTransferObjects"
+    effect = "Allow"
+    actions = [
+      "s3:DeleteObject",
+      "s3:GetObject",
+      "s3:PutObject",
+    ]
+    resources = ["arn:aws:s3:::${var.ansible_ssm_bucket_name}/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "ansible_ssm_bucket" {
+  name   = "${var.name_prefix}-ansible-ssm-bucket"
+  role   = aws_iam_role.ec2.id
+  policy = data.aws_iam_policy_document.ansible_ssm_bucket.json
+}
+
 resource "aws_iam_instance_profile" "ec2" {
   name = "${var.name_prefix}-ec2-profile"
   role = aws_iam_role.ec2.name
