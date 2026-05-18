@@ -80,8 +80,8 @@ variable "health_path" {
   default     = "/health"
 }
 
-variable "ansible_ssm_bucket_name" {
-  description = "Optional S3 bucket used by Ansible's aws_ssm connection plugin for file transfer."
+variable "alarm_email" {
+  description = "Optional email subscribed to the alarms SNS topic. Empty = topic without subscription."
   type        = string
   default     = ""
 }

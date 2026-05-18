@@ -34,9 +34,9 @@ resource "aws_launch_template" "app" {
     resource_type = "instance"
     tags = {
       Name        = "${var.name_prefix}-app"
-      Role        = "web"
-      Service     = var.service
-      Environment = var.environment
+      role        = "web"
+      service     = var.service
+      environment = var.environment
     }
   }
 
@@ -81,19 +81,19 @@ resource "aws_autoscaling_group" "app" {
   }
 
   tag {
-    key                 = "Role"
+    key                 = "role"
     value               = "web"
     propagate_at_launch = true
   }
 
   tag {
-    key                 = "Service"
+    key                 = "service"
     value               = var.service
     propagate_at_launch = true
   }
 
   tag {
-    key                 = "Environment"
+    key                 = "environment"
     value               = var.environment
     propagate_at_launch = true
   }

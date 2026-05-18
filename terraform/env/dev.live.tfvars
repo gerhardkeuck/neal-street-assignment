@@ -6,5 +6,3 @@ instance_type    = "t4g.nano"
 desired_capacity = 1
 min_size         = 1
 max_size         = 3
-
-ansible_ssm_bucket_name = "rewards-dev-ansible-ssm-transfer-696715199782"
