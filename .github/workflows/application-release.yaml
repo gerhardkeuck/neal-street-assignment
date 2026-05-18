@@ -3,10 +3,10 @@ name: application-release
 on:
   push:
     branches:
-      - main
+    - main
     paths:
-      - "application/**"
-      - ".github/workflows/application-release.yaml"
+    - "application/**"
+    - ".github/workflows/application-release.yaml"
 
 permissions:
   contents: write
@@ -18,23 +18,23 @@ jobs:
       run:
         working-directory: application
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "1.26.3"
-          cache-dependency-path: application/go.sum
-      - name: Build linux arm64 binary
-        run: go build -trimpath -ldflags "-s -w" -o dist/rewards-linux-arm64 .
-        env:
-          CGO_ENABLED: "0"
-          GOOS: linux
-          GOARCH: arm64
-      - name: Publish GitHub release
-        run: |
-          tag="rewards-${GITHUB_RUN_NUMBER}"
-          gh release create "${tag}" dist/rewards-linux-arm64 \
-            --target "${GITHUB_SHA}" \
-            --title "${tag}" \
-            --notes "Linux arm64 rewards service build from ${GITHUB_SHA}."
-        env:
-          GH_TOKEN: ${{ github.token }}
+    - uses: actions/checkout@v6
+    - uses: actions/setup-go@v6
+      with:
+        go-version-file: application/go.mod
+        cache-dependency-path: application/go.sum
+    - name: Build linux arm64 binary
+      run: go build -trimpath -ldflags "-s -w" -o dist/rewards-linux-arm64 .
+      env:
+        CGO_ENABLED: "0"
+        GOOS: linux
+        GOARCH: arm64
+    - name: Publish GitHub release
+      run: |
+        tag="rewards-${GITHUB_SHA::7}"
+        gh release create "${tag}" dist/rewards-linux-arm64 \
+          --target "${GITHUB_SHA}" \
+          --title "${tag}" \
+          --notes "Linux arm64 rewards service build from ${SHORT_HASH} (${GITHUB_SHA})."
+      env:
+        GH_TOKEN: ${{ github.token }}

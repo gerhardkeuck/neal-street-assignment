@@ -3,8 +3,8 @@ name: application-pr
 on:
   pull_request:
     paths:
-      - "application/**"
-      - ".github/workflows/application-pr.yaml"
+    - "application/**"
+    - ".github/workflows/application-pr.yaml"
 
 jobs:
   verify:
@@ -13,14 +13,20 @@ jobs:
       run:
         working-directory: application
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "1.26.3"
-          cache-dependency-path: application/go.sum
-      - name: Verify formatting
-        run: test -z "$(gofmt -l .)"
-      - name: Lint
-        run: go vet ./...
-      - name: Test
-        run: go test ./...
+    - uses: actions/checkout@v6
+    - uses: actions/setup-go@v6
+      with:
+        go-version-file: application/go.mod
+        cache-dependency-path: application/go.sum
+    - name: Verify formatting
+      run: test -z "$(gofmt -l .)"
+    - name: Lint
+      run: go vet ./...
+    - name: Test
+      run: go test ./...
+    - name: Cross-compile sanity check
+      run: go build -trimpath ./...
+      env:
+        CGO_ENABLED: "0"
+        GOOS: linux
+        GOARCH: arm64
