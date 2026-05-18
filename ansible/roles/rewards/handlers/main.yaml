@@ -9,8 +9,3 @@
     name: "{{ rewards_service_name }}"
     state: restarted
   listen: rewards_restart
-
-- name: Reload firewalld
-  ansible.builtin.command: firewall-cmd --reload
-  listen: rewards_firewalld_reload
-  changed_when: true
