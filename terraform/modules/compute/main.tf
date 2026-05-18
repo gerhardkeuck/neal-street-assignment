@@ -61,7 +61,9 @@ resource "aws_autoscaling_group" "app" {
 
   launch_template {
     id      = aws_launch_template.app.id
-    version = "$Latest"
+    # Pin to the resolved version so launch template changes produce a diff
+    # on the ASG, which is what triggers instance_refresh.
+    version = aws_launch_template.app.latest_version
   }
 
   instance_refresh {
