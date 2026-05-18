@@ -7,7 +7,7 @@ on:
     - 'terraform/env/**'
     - 'terraform/live/**'
     - 'terraform/modules/**'
-    - 'dev-tf-plan.yaml'
+    - '.github/workflows/dev-tf-plan.yaml'
 
 permissions:
   contents: read
