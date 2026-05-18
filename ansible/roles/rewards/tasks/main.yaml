@@ -27,6 +27,6 @@
 - name: Configure systemd service
   ansible.builtin.include_tasks: service.yaml
 
-- name: Configure host firewall
-  ansible.builtin.include_tasks: firewall.yaml
-  when: rewards_configure_firewall | bool
+- name: Enable unattended security updates
+  ansible.builtin.include_tasks: updates.yaml
+  when: rewards_unattended_upgrades_enabled | bool
