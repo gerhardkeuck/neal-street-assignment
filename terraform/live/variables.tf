@@ -34,7 +34,7 @@ variable "vpc_cidr" {
 }
 
 variable "public_subnet_cidrs" {
-  description = "CIDRs for public ALB subnets."
+  description = "CIDRs for public NLB subnets."
   type        = list(string)
 }
 

@@ -11,11 +11,8 @@ resource "aws_launch_template" "app" {
     associate_public_ip_address = false
     delete_on_termination       = true
     device_index                = 0
-    ipv6_address_count          = 1
     security_groups             = [var.app_security_group_id]
   }
-
-  vpc_security_group_ids = [var.app_security_group_id]
 
   metadata_options {
     http_endpoint               = "enabled"
