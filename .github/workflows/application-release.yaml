@@ -35,6 +35,6 @@ jobs:
         gh release create "${tag}" dist/rewards-linux-arm64 \
           --target "${GITHUB_SHA}" \
           --title "${tag}" \
-          --notes "Linux arm64 rewards service build from ${SHORT_HASH} (${GITHUB_SHA})."
+          --notes "Linux arm64 rewards service build from ${tag#rewards-} (${GITHUB_SHA})."
       env:
         GH_TOKEN: ${{ github.token }}
