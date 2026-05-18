@@ -1,44 +1,16 @@
-# TODO only create the role, sufficently to assume role and apply terraform in live. Further roles
-
-data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
-
-locals {
-  github_ci_workspaces = length(var.github_ci_workspaces) == 0 ? var.allowed_workspaces : var.github_ci_workspaces
-  github_oidc_subjects = {
-    for workspace in local.github_ci_workspaces :
-    workspace => lookup(
-      var.github_oidc_subjects,
-      workspace,
-      "repo:${var.github_repository}:environment:${workspace}"
-    )
-  }
-
-  terraform_state_bucket = "tfstate-neal-street-696715199782-eu-west-1-an"
-  terraform_state_bucket_arn = "arn:${data.aws_partition.current.partition}:s3:::${local.terraform_state_bucket}"
-
-  terraform_state_objects = {
-    for workspace in local.github_ci_workspaces :
-    workspace => "${var.terraform_workspace_key_prefix}/${workspace}/${var.terraform_state_key}"
-  }
-  terraform_lock_objects = {
-    for workspace, state_object in local.terraform_state_objects :
-    workspace => "${state_object}.tflock"
-  }
-}
+data "aws_caller_identity" "current" {}
 
 resource "aws_iam_openid_connect_provider" "github_actions" {
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
+  # https://github.blog/changelog/2023-06-27-github-actions-update-on-oidc-integration-with-aws/
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1", "1c58a3a8518e8759bf075b76b750d4f2df264fcd"]
 
-  tags = {
-    Name = "${var.service}-github-actions-oidc"
-  }
+  tags = { Name = "${local.name_prefix}-github-actions-oidc" }
 }
 
 data "aws_iam_policy_document" "github_actions_assume_role" {
-  for_each = toset(local.github_ci_workspaces)
-
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRoleWithWebIdentity"]
@@ -57,35 +29,27 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = [local.github_oidc_subjects[each.key]]
+      values   = [local.github_oidc_sub]
     }
   }
 }
 
 resource "aws_iam_role" "github_actions_terraform" {
-  for_each = toset(local.github_ci_workspaces)
+  name               = local.github_actions_role_name
+  assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role.json
+  description        = "GitHub Actions role for ${var.service} ${local.environment}."
 
-  name               = "${var.github_role_name_prefix}-${var.service}-${each.key}-terraform"
-  assume_role_policy = data.aws_iam_policy_document.github_actions_assume_role[each.key].json
-  description        = "GitHub Actions Terraform role for ${var.service} ${each.key}."
-
-  tags = merge(local.tags, {
-    Name        = "${var.github_role_name_prefix}-${var.service}-${each.key}-terraform"
-    environment = each.key
-    workspace   = each.key
-  })
+  tags = merge(local.tags, { Name = local.github_actions_role_name })
 
   lifecycle {
     precondition {
-      condition     = length("${var.github_role_name_prefix}-${var.service}-${each.key}-terraform") <= 64
-      error_message = "GitHub Actions role name for workspace '${each.key}' exceeds the IAM role name limit of 64 characters."
+      condition     = length(local.github_actions_role_name) <= 64
+      error_message = "GitHub Actions role name exceeds the IAM 64-character limit."
     }
   }
 }
 
 data "aws_iam_policy_document" "github_actions_state_access" {
-  for_each = toset(local.github_ci_workspaces)
-
   statement {
     sid       = "ReadBucketLocation"
     effect    = "Allow"
@@ -102,41 +66,103 @@ data "aws_iam_policy_document" "github_actions_state_access" {
     condition {
       test     = "StringLike"
       variable = "s3:prefix"
-      values = [
-        var.terraform_state_key,
-        var.terraform_workspace_key_prefix,
-        "${var.terraform_workspace_key_prefix}/",
-        "${var.terraform_workspace_key_prefix}/${each.key}",
-        "${var.terraform_workspace_key_prefix}/${each.key}/*",
-      ]
+      values   = ["${var.terraform_workspace_key_prefix}/${local.environment}/*"]
     }
   }
 
   statement {
-    sid    = "ReadWriteWorkspaceState"
+    sid    = "ReadWriteDeleteWorkspaceState"
     effect = "Allow"
     actions = [
       "s3:GetObject",
       "s3:PutObject",
+      "s3:DeleteObject",
     ]
-    resources = [
-      "${local.terraform_state_bucket_arn}/${local.terraform_state_objects[each.key]}",
-      "${local.terraform_state_bucket_arn}/${local.terraform_lock_objects[each.key]}",
-    ]
-  }
-
-  statement {
-    sid       = "DeleteWorkspaceLockFile"
-    effect    = "Allow"
-    actions   = ["s3:DeleteObject"]
-    resources = ["${local.terraform_state_bucket_arn}/${local.terraform_lock_objects[each.key]}"]
+    resources = ["${local.terraform_state_bucket_arn}/${local.terraform_state_object}"]
   }
 }
 
 resource "aws_iam_role_policy" "github_actions_state_access" {
-  for_each = toset(local.github_ci_workspaces)
+  name   = "${aws_iam_role.github_actions_terraform.name}-state"
+  role   = aws_iam_role.github_actions_terraform.id
+  policy = data.aws_iam_policy_document.github_actions_state_access.json
+}
 
-  name   = "${aws_iam_role.github_actions_terraform[each.key].name}-state"
-  role   = aws_iam_role.github_actions_terraform[each.key].id
-  policy = data.aws_iam_policy_document.github_actions_state_access[each.key].json
+data "aws_iam_policy_document" "github_actions_bootstrap_access" {
+  statement {
+    sid    = "ManageEnvironmentInfrastructure"
+    effect = "Allow"
+    actions = [
+      "autoscaling:*",
+      "cloudwatch:*",
+      "ec2:*",
+      "elasticloadbalancing:*",
+      "logs:*",
+      "secretsmanager:*",
+      "sns:*",
+      "ssm:*",
+      "sts:GetCallerIdentity",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "ReadIamForTerraform"
+    effect = "Allow"
+    actions = [
+      "iam:Get*",
+      "iam:List*",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "ManageEnvironmentIam"
+    effect = "Allow"
+    actions = [
+      "iam:AddRoleToInstanceProfile",
+      "iam:AttachRolePolicy",
+      "iam:CreateInstanceProfile",
+      "iam:CreatePolicy",
+      "iam:CreatePolicyVersion",
+      "iam:CreateRole",
+      "iam:DeleteInstanceProfile",
+      "iam:DeletePolicy",
+      "iam:DeletePolicyVersion",
+      "iam:DeleteRole",
+      "iam:DeleteRolePolicy",
+      "iam:DetachRolePolicy",
+      "iam:PassRole",
+      "iam:PutRolePolicy",
+      "iam:RemoveRoleFromInstanceProfile",
+      "iam:SetDefaultPolicyVersion",
+      "iam:TagInstanceProfile",
+      "iam:TagPolicy",
+      "iam:TagRole",
+      "iam:UntagInstanceProfile",
+      "iam:UntagPolicy",
+      "iam:UntagRole",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:UpdateRole",
+      "iam:UpdateRoleDescription",
+    ]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:role/${local.name_prefix}-*",
+      "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:policy/${local.name_prefix}-*",
+      "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:instance-profile/${local.name_prefix}-*",
+    ]
+  }
+
+  statement {
+    sid       = "CreateServiceLinkedRoles"
+    effect    = "Allow"
+    actions   = ["iam:CreateServiceLinkedRole"]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role_policy" "github_actions_bootstrap_access" {
+  name   = "${aws_iam_role.github_actions_terraform.name}-bootstrap"
+  role   = aws_iam_role.github_actions_terraform.id
+  policy = data.aws_iam_policy_document.github_actions_bootstrap_access.json
 }

@@ -1,4 +1,20 @@
 # Management module
 
-This module only provisions the minimum required role for Github Actions to assume an admin role to for managing
-Terraform.
+This module provisions the GitHub Actions OIDC provider and the workspace-scoped IAM role used by Terraform and
+Ansible deploy workflows.
+
+For dev:
+
+```bash
+pushd management
+
+terraform init \
+  -backend-config=../env/dev.backend.common.hcl \
+  -backend-config=key=management/terraform.tfstate
+
+terraform workspace select -or-create dev
+
+terraform plan \
+  -var-file=../env/dev.common.tfvars \
+  -var-file=../env/dev.management.tfvars
+```
