@@ -2,7 +2,7 @@ locals {
   environment = terraform.workspace
   name_prefix = "${var.service}-${local.environment}"
 
-  secret_name              = "/${var.service}/${local.environment}/*"
+  secret_name_prefix       = "/${local.environment}/${var.service}/"
   github_actions_role_name = "${local.name_prefix}-github-actions"
 
   tags = {

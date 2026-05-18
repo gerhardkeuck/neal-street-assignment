@@ -27,18 +27,23 @@ resource "aws_iam_role_policy_attachment" "cw_agent" {
 
 data "aws_iam_policy_document" "app_secret" {
   statement {
-    sid     = "ReadOnlyNamedAppSecret"
-    effect  = "Allow"
-    actions = ["ssm:GetParameter", "ssm:GetParameters"]
+    sid    = "ReadAppSecretsByPrefix"
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+    ]
+    # Secrets Manager appends a 6-char random suffix to the ARN; the trailing
+    # "*" covers both that suffix and any sibling secret under the prefix.
     resources = [
-      "arn:aws:ssm:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:parameter${var.app_secret_parameter_name}"
+      "arn:aws:secretsmanager:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:secret:${var.app_secret_name_prefix}*"
     ]
   }
 }
 
 resource "aws_iam_policy" "app_secret" {
   name        = "${var.name_prefix}-app-secret-read"
-  description = "Permit EC2 app role to read the externally provisioned secret."
+  description = "Permit EC2 app role to read externally provisioned Secrets Manager secrets under the app prefix."
   policy      = data.aws_iam_policy_document.app_secret.json
 }
 
