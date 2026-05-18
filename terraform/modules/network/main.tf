@@ -33,6 +33,60 @@ module "vpc" {
   private_subnet_enable_dns64 = true
 }
 
+resource "aws_security_group" "vpce" {
+  name        = "${var.name_prefix}-vpce-sg"
+  description = "HTTPS from VPC resources to interface endpoints"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    description = "HTTPS from VPC"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = { Name = "${var.name_prefix}-vpce-sg" }
+}
+
+locals {
+  ssm_interface_endpoints = toset([
+    "ssm",
+    "ssmmessages",
+    "ec2messages",
+  ])
+}
+
+resource "aws_vpc_endpoint" "ssm_interface" {
+  for_each = local.ssm_interface_endpoints
+
+  vpc_id              = module.vpc.vpc_id
+  service_name        = "com.amazonaws.${var.aws_region}.${each.key}"
+  vpc_endpoint_type   = "Interface"
+  subnet_ids          = module.vpc.private_subnets
+  security_group_ids  = [aws_security_group.vpce.id]
+  private_dns_enabled = true
+
+  tags = { Name = "${var.name_prefix}-${each.key}-vpce" }
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = module.vpc.vpc_id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = module.vpc.private_route_table_ids
+
+  tags = { Name = "${var.name_prefix}-s3-vpce" }
+}
+
 
 # resource "aws_vpc" "this" {
 #   cidr_block           = var.vpc_cidr

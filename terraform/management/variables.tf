@@ -39,7 +39,7 @@ variable "github_repository" {
 }
 
 variable "github_oidc_sub" {
-  description = "GitHub OIDC subject claim. Defaults to any branch in github_repository."
+  description = "GitHub OIDC subject claim. Defaults to any subject in github_repository."
   type        = string
   default     = ""
 }

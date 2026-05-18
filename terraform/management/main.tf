@@ -49,6 +49,11 @@ resource "aws_iam_role" "github_actions_terraform" {
   }
 }
 
+resource "aws_iam_role_policy_attachment" "github_actions_admin" {
+  role       = aws_iam_role.github_actions_terraform.name
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/AdministratorAccess"
+}
+
 data "aws_iam_policy_document" "github_actions_state_access" {
   statement {
     sid       = "ReadBucketLocation"
