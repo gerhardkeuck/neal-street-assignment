@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   apply:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: dev
     steps:
     - uses: actions/checkout@v4
@@ -29,12 +29,12 @@ jobs:
         aws-region: eu-west-1
     - uses: hashicorp/setup-terraform@v3
       with:
-        terraform_version: 1.9.0
+        terraform_version: 1.11.0
     - name: Init
       run: |
         terraform -chdir=terraform/live init \
           -backend-config=../env/dev.backend.common.hcl \
-          -backend-config=key=rewards/terraform.tfstate
+          -backend-config=../env/dev.backend.live.hcl
     - name: Select workspace
       run: terraform -chdir=terraform/live workspace select -or-create dev
     - name: Apply

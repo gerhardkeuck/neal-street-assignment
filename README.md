@@ -30,8 +30,9 @@ state resources must be created beforehand:
 > NOTE: Most examples in the project use the `dev` environ/workspace. For production, use `prod`.
 
 1. First create the environment files under `terraform/env/`. Shared values go in `<workspace>.common.tfvars`,
-   root-specific values go in `<workspace>.<root>.tfvars`, and shared backend values go in
-   `<workspace>.backend.common.hcl`.
+   root-specific values go in `<workspace>.<root>.tfvars`, shared backend values go in
+   `<workspace>.backend.common.hcl`, and root-specific backend keys go in
+   `<workspace>.backend.<root>.hcl`. Where `<root>` is the name of the relevant module.
 2. Then create the required state resources:
 
 ```shell
@@ -54,11 +55,11 @@ cd terraform
    These resources will not be managed by GHA:
 
 ```bash
-push terraform/management
+pushd terraform/management
 
 terraform init \
   -backend-config=../env/dev.backend.common.hcl \
-  -backend-config=key=management/terraform.tfstate
+  -backend-config=../env/dev.backend.management.hcl
 
 terraform workspace select -or-create dev
 
@@ -75,11 +76,11 @@ terraform apply \
 pushd terraform/live
 terraform init \
   -backend-config=../env/dev.backend.common.hcl \
-  -backend-config=key=rewards/terraform.tfstate
+  -backend-config=../env/dev.backend.live.hcl
 
 terraform workspace select -or-create dev
 # Plan or apply
-terraform plane \
+terraform plan \
   -var-file=../env/dev.common.tfvars \
   -var-file=../env/dev.live.tfvars
 ```

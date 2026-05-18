@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: dev
     steps:
     - uses: actions/checkout@v4
@@ -34,7 +34,7 @@ jobs:
       run: |
         terraform -chdir=terraform/live init \
           -backend-config=../env/dev.backend.common.hcl \
-          -backend-config=key=rewards/terraform.tfstate
+          -backend-config=../env/dev.backend.live.hcl
 
     - name: Select workspace
       run: terraform -chdir=terraform/live workspace select -or-create dev

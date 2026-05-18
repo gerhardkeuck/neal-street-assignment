@@ -29,29 +29,28 @@ module "iam" {
 }
 
 
-# module "loadbalancer" {
-#   source            = "../modules/loadbalancer"
-#   name_prefix       = local.name_prefix
-#   public_subnet_ids = module.network.public_subnet_ids
-#   app_port          = var.app_port
-#   health_path       = var.health_path
-#   vpc_id            = module.network.vpc_id
-# }
-#
-#
-# module "compute" {
-#   source = "../modules/compute"
-#
-#   name_prefix           = local.name_prefix
-#   service               = var.service
-#   environment           = local.environment
-#   aws_region            = var.aws_region
-#   subnet_ids            = module.network.private_subnet_ids
-#   app_security_group_id = module.security.app_security_group_id
-#   target_group_arn      = module.alb.target_group_arn
-#   instance_profile_name = module.iam.instance_profile_name
-#   instance_type         = var.instance_type
-#   desired_capacity      = var.desired_capacity
-#   min_size              = var.min_size
-#   max_size              = var.max_size
-# }
+module "loadbalancer" {
+  source            = "../modules/loadbalancer"
+  name_prefix       = local.name_prefix
+  public_subnet_ids = module.network.public_subnet_ids
+  app_port          = var.app_port
+  health_path       = var.health_path
+  vpc_id            = module.network.vpc_id
+}
+
+
+module "compute" {
+  source = "../modules/compute"
+
+  name_prefix           = local.name_prefix
+  service               = var.service
+  environment           = local.environment
+  subnet_ids            = module.network.private_subnet_ids
+  app_security_group_id = module.security.app_security_group_id
+  target_group_arn      = module.loadbalancer.target_group_arn
+  instance_profile_name = module.iam.instance_profile_name
+  instance_type         = var.instance_type
+  desired_capacity      = var.desired_capacity
+  min_size              = var.min_size
+  max_size              = var.max_size
+}

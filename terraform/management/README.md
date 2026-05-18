@@ -10,7 +10,7 @@ pushd management
 
 terraform init \
   -backend-config=../env/dev.backend.common.hcl \
-  -backend-config=key=management/terraform.tfstate
+  -backend-config=../env/dev.backend.management.hcl
 
 terraform workspace select -or-create dev
 
