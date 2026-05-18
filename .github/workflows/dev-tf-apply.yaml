@@ -1,0 +1,46 @@
+name: Dev Apply Terraform
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+    - 'terraform/env/**'
+    - 'terraform/live/**'
+    - 'terraform/modules/**'
+    - 'dev-tf-apply.yaml'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dev-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    environment: dev
+    steps:
+    - uses: actions/checkout@v4
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+        aws-region: eu-west-1
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.11.0
+    - name: Init
+      run: |
+        terraform -chdir=terraform/live init \
+          -backend-config=../env/dev.backend.common.hcl \
+          -backend-config=../env/dev.backend.live.hcl
+    - name: Select workspace
+      run: terraform -chdir=terraform/live workspace select -or-create dev
+    - name: Apply
+      run: |
+        terraform -chdir=terraform/live apply \
+          -auto-approve \
+          -input=false \
+          -var-file=../env/dev.common.tfvars \
+          -var-file=../env/dev.live.tfvars

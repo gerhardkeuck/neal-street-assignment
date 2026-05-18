@@ -16,10 +16,10 @@ module "vpc" {
   enable_dns_support   = true
 
   # IPv6: request an Amazon-provided /56 and an egress-only IGW for private subnets
-  enable_ipv6                         = true
+  enable_ipv6 = true
 
   # Carve unique /64s out of the VPC's /56 for each subnet
-  public_subnet_ipv6_prefixes  = range(length(var.public_subnet_cidrs))
+  public_subnet_ipv6_prefixes = range(length(var.public_subnet_cidrs))
   private_subnet_ipv6_prefixes = range(
     length(var.public_subnet_cidrs),
     length(var.public_subnet_cidrs) + length(var.private_subnet_cidrs),
