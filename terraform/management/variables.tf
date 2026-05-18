@@ -30,7 +30,7 @@ variable "cost_center" {
 variable "github_repository" {
   description = "GitHub repository allowed to assume the Terraform CI roles, in owner/repo format."
   type        = string
-  default     = "gerhardkeuck/neal-street-assigment"
+  default     = "gerhardkeuck/neal-street-assignment"
 
   validation {
     condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))

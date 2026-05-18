@@ -87,7 +87,7 @@ prefer to retrieve secrets directly from AWS Secrets Manager. This limits secret
 will not be visible to Ansible logs or other deployment related runners.
 
 **Structing modules between environments**
-For this assigment a single AWS account was used, given the assigment constraints. Only the `dev` environment has been
+For this assignment a single AWS account was used, given the assignment constraints. Only the `dev` environment has been
 provisioned. In a production rollout, I would promote the same Terraform/Ansible pattern into a
 separate prod AWS account, using a distinct Terraform backend/state path, separate GitHub OIDC IAM role, separate secret
 namespace, and manual approval before apply. This keeps blast radius, credentials, and audit boundaries separate without

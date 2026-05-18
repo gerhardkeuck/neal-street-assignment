@@ -1,6 +1,6 @@
-# Neal Street - Technical Assigment
+# Neal Street - Technical Assignment
 
-This project servers as the deliverable for the Neal Streat Senior Cloud Engineer Technical Assigment.
+This project servers as the deliverable for the Neal Streat Senior Cloud Engineer Technical Assignment.
 
 ## How to use this repo
 
