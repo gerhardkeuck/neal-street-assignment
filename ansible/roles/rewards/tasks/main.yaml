@@ -1,0 +1,32 @@
+---
+- name: Validate required role inputs
+  ansible.builtin.assert:
+    that:
+    - rewards_binary_url | length > 0
+    - rewards_secret_name | length > 0
+    - rewards_environment | length > 0
+    fail_msg: >-
+      rewards_binary_url, rewards_secret_name and rewards_environment must all
+      be set (typically via inventory group_vars or instance tags).
+
+- name: Install OS packages
+  ansible.builtin.include_tasks: packages.yaml
+
+- name: Create system user
+  ansible.builtin.include_tasks: user.yaml
+
+- name: Create application directories
+  ansible.builtin.include_tasks: directories.yaml
+
+- name: Install release binary
+  ansible.builtin.include_tasks: binary.yaml
+
+- name: Render runtime configuration
+  ansible.builtin.include_tasks: config.yaml
+
+- name: Configure systemd service
+  ansible.builtin.include_tasks: service.yaml
+
+- name: Configure host firewall
+  ansible.builtin.include_tasks: firewall.yaml
+  when: rewards_configure_firewall | bool

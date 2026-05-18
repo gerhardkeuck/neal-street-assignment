@@ -1,0 +1,66 @@
+---
+# All three lookups below execute on the remote instance, so the EC2 instance
+# profile (granted in terraform/modules/iam) is what authorises them — no AWS
+# credentials are exposed to the Ansible controller / GitHub Actions runner.
+
+- name: Fetch region from IMDSv2
+  ansible.builtin.shell: |
+    set -euo pipefail
+    token=$(curl -sfX PUT \
+      -H "X-aws-ec2-metadata-token-ttl-seconds: 60" \
+      http://169.254.169.254/latest/api/token)
+    curl -sf \
+      -H "X-aws-ec2-metadata-token: ${token}" \
+      http://169.254.169.254/latest/meta-data/placement/region
+  args:
+    executable: /bin/bash
+  register: rewards_imds_region
+  changed_when: false
+  check_mode: false
+
+- name: Set region fact
+  ansible.builtin.set_fact:
+    rewards_aws_region: "{{ rewards_imds_region.stdout | trim }}"
+
+- name: Read application secret from Secrets Manager
+  # `aws-cli` here uses the EC2 instance profile via IMDS — no static creds.
+  ansible.builtin.command:
+    argv:
+    - aws
+    - secretsmanager
+    - get-secret-value
+    - --region
+    - "{{ rewards_aws_region }}"
+    - --secret-id
+    - "{{ rewards_secret_name }}"
+    - --query
+    - SecretString
+    - --output
+    - text
+  register: rewards_secret_raw
+  changed_when: false
+  check_mode: false
+  no_log: true
+
+- name: Parse secret JSON and extract APP_SECRET
+  ansible.builtin.set_fact:
+    rewards_secret_doc: "{{ rewards_secret_raw.stdout | from_json }}"
+  no_log: true
+
+- name: Assert APP_SECRET key is present
+  ansible.builtin.assert:
+    that:
+    - rewards_secret_app_key in rewards_secret_doc
+    fail_msg: "Secret '{{ rewards_secret_name }}' has no key '{{ rewards_secret_app_key }}'"
+
+- name: Render rewards.env
+  ansible.builtin.template:
+    src: rewards.env.j2
+    dest: "{{ rewards_env_file }}"
+    owner: root
+    group: "{{ rewards_group }}"
+    mode: "0640"
+  vars:
+    rewards_app_secret: "{{ rewards_secret_doc[rewards_secret_app_key] }}"
+  no_log: true
+  notify: rewards_restart

@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
     - "application/**"
-    - "application-verify.yaml"
+    - ".github/workflows/application-verify.yaml"
 
 jobs:
   verify:

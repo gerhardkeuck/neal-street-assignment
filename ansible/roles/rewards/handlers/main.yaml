@@ -1,0 +1,16 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: rewards_systemd_reload
+
+- name: Restart rewards
+  ansible.builtin.systemd:
+    name: "{{ rewards_service_name }}"
+    state: restarted
+  listen: rewards_restart
+
+- name: Reload firewalld
+  ansible.builtin.command: firewall-cmd --reload
+  listen: rewards_firewalld_reload
+  changed_when: true

@@ -1,0 +1,30 @@
+[Unit]
+Description=Rewards web service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ rewards_user }}
+Group={{ rewards_group }}
+EnvironmentFile={{ rewards_env_file }}
+ExecStart={{ rewards_binary_path }}
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=65535
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ReadWritePaths={{ rewards_log_dir }}
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

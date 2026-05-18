@@ -1,0 +1,87 @@
+name: deploy-app-dev
+
+on:
+  workflow_dispatch:
+    inputs:
+      binary_url:
+        description: "URL to the rewards release binary (overrides the default release lookup)"
+        required: false
+        default: ""
+  push:
+    branches:
+    - main
+    paths:
+    - "ansible/**"
+    - ".github/workflows/deploy-app-dev.yaml"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: dev
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-west-1
+  ANSIBLE_SSM_BUCKET: rewards-dev-ansible-ssm-696715199782
+
+jobs:
+  configure-dev:
+    name: Configure dev EC2 hosts with Ansible over SSM
+    runs-on: ubuntu-24.04
+    environment: dev
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+
+    - name: Configure AWS credentials from GitHub OIDC
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Install Python + Ansible
+      run: |
+        python -m pip install --upgrade pip
+        pip install ansible boto3 botocore
+
+    - name: Install Ansible collections
+      working-directory: ansible
+      run: ansible-galaxy collection install -r requirements.yaml
+
+    - name: Install AWS Session Manager plugin
+      run: |
+        curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
+          -o /tmp/session-manager-plugin.deb
+        sudo dpkg -i /tmp/session-manager-plugin.deb
+        session-manager-plugin --version
+
+    - name: Resolve binary URL
+      id: bin
+      run: |
+        url="${{ inputs.binary_url }}"
+        if [ -z "$url" ]; then
+          url=$(gh release view --repo "${{ github.repository }}" \
+            --json assets --jq '.assets[] | select(.name | endswith("linux-arm64")) | .url' | head -n1)
+        fi
+        if [ -z "$url" ]; then
+          echo "No binary URL resolved (no input and no matching release asset)." >&2
+          exit 1
+        fi
+        echo "url=$url" >> "$GITHUB_OUTPUT"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Show dynamic inventory
+      working-directory: ansible
+      run: ansible-inventory -i inventories/dev.aws_ec2.yaml --graph
+
+    - name: Run deploy playbook
+      working-directory: ansible
+      run: |
+        ansible-playbook \
+          -i inventories/dev.aws_ec2.yaml \
+          playbooks/deploy.yaml \
+          --extra-vars "rewards_binary_url=${{ steps.bin.outputs.url }} rewards_commit_hash=${GITHUB_SHA::7}"

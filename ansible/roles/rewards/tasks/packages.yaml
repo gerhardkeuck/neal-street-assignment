@@ -1,0 +1,14 @@
+---
+# AL2023 ships aws-cli v2 and curl; we still declare them so the role is
+# explicit about its runtime needs and survives a re-baked image.
+- name: Install required OS packages
+  ansible.builtin.dnf:
+    name: "{{ rewards_packages }}"
+    state: present
+  vars:
+    rewards_packages: >-
+      {{
+        ['curl-minimal', 'unzip', 'ca-certificates', 'tar']
+        + (['amazon-cloudwatch-agent'] if rewards_install_cloudwatch_agent else [])
+        + (['firewalld'] if rewards_configure_firewall else [])
+      }}

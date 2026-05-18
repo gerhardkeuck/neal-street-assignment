@@ -1,0 +1,10 @@
+---
+# Env-neutral: the chosen inventory file restricts hosts to one environment,
+# and per-host env/service facts are composed from EC2 tags by the inventory.
+- name: Configure rewards web tier
+  hosts: rewards
+  become: true
+  gather_facts: true
+
+  roles:
+  - rewards

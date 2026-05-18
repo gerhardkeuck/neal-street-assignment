@@ -1,0 +1,16 @@
+---
+- name: Ensure rewards group exists
+  ansible.builtin.group:
+    name: "{{ rewards_group }}"
+    system: true
+    state: present
+
+- name: Ensure rewards system user exists
+  ansible.builtin.user:
+    name: "{{ rewards_user }}"
+    group: "{{ rewards_group }}"
+    system: true
+    shell: /sbin/nologin
+    home: "{{ rewards_install_dir }}"
+    create_home: false
+    state: present
