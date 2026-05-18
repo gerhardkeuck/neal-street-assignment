@@ -1,0 +1,20 @@
+---
+# AL2023 equivalent of unattended-upgrades. Applies security updates on the
+# default systemd timer (daily); the package itself is pulled by packages.yaml
+# when rewards_unattended_upgrades_enabled is true.
+- name: Configure dnf-automatic for security updates only
+  ansible.builtin.lineinfile:
+    path: /etc/dnf/automatic.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+  - { regexp: '^upgrade_type\s*=', line: 'upgrade_type = security' }
+  - { regexp: '^apply_updates\s*=', line: 'apply_updates = yes' }
+  - { regexp: '^download_updates\s*=', line: 'download_updates = yes' }
+
+- name: Enable dnf-automatic timer
+  ansible.builtin.systemd:
+    name: dnf-automatic.timer
+    enabled: true
+    state: started
