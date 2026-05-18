@@ -1,0 +1,26 @@
+name: application-pr
+
+on:
+  pull_request:
+    paths:
+      - "application/**"
+      - ".github/workflows/application-pr.yaml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: application
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.3"
+          cache-dependency-path: application/go.sum
+      - name: Verify formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Lint
+        run: go vet ./...
+      - name: Test
+        run: go test ./...
