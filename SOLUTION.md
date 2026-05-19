@@ -8,15 +8,15 @@ High level task sequence breakdown, accounting for dependencies between tasks:
 
 - Create minimal Go app to expose endpoint and generated logs
 - GHA for go app: Test, build and release on Github Actions.
-- Create terraform backend bootsrap.
+- Create terraform backend bootstrap.
 - Create `managed` resources, for GHA to use Ansible and Terraform.
     - Role to assume, SSM to EC2, sufficient admin for Terraform management.
-- Create `dev` environment Terraform resources.
-- Workflows for plan & apply TF for dev
-- Create ansible playbook for deploying from GitHub.
-- Configure logging with cloudwatch logs.
+- Create GHA workflows for managing `live` terraform resources.
+- Create `dev` live environment Terraform resources.
+- Create Ansible playbook/roles/inventory for deploying from GitHub to EC2 group.
+- Configure logging with Cloudwatch logs.
 - Teardown steps.
-- Smoke test solution.
+- Smoke test solution during and afterwards.
 
 Continuously update README.md and SOLUTION.md while progressing.
 
@@ -27,18 +27,19 @@ project constraints. Here the high level reasons for choices are explained.
 
 **Terraform state handling approach**
 
-Instead of storing state locally and commiting it to the repo or using some form of manual state distribution, this
-project
-uses the S3 backend to securely store state. A locking files is used per module, to enable concurrent operation between
-environments.
+State is stored remotely in an S3 backend with native S3 locking (one lockfile per state object) and bucket
+versioning + default encryption enabled. The bucket is created once by `terraform/bootstrap-backend.sh` to break the
+chicken-and-egg before Terraform itself can manage state.
 
+Trade-offs vs. the alternatives, in the context of a small team:
 
-[//]: # (TODO explain tradeoffs and suitability for small teams)
-
-Compared to local state this does require some additional setup, although this is a once off exercise.
-
-A simple shell script was used for the state bucket provisioning, this is needed to solve the catch-22 before Terraform
-state can be stored. This step could normally be managed with Terragrunt.
+- **vs. local state**:
+    - Gain: concurrent safe collaboration, durable history, CI can plan/apply against the same state a developer just
+      produced.
+    - Cost: one-off bootstrap script and an extra S3 bucket per account and store for state files.
+- **vs. Terraform Cloud / HCP**:
+    - Pros: zero cost, no extra vendor, runs are on GitHub Actions.
+    - Cons: no managed run UI, no built-in policy/cost gates (acceptable at this size).
 
 **Multiple Terraform projects**
 
@@ -48,6 +49,16 @@ There are two parts for the Terraform solution:
   AWS. This need to be run manually beforehand.
 - The `live` module provisions infrastructure for the `dev` (and `prod` if vars are defined) environments. This module
   can be fully managed through git PRs.
+
+**Single module for live environments**
+
+The `live` module is designed to be a single module for managing infrastructure across multiple environments. This
+approach simplifies the management of infrastructure by consolidating the configuration and state
+management into a single module, making it easier to maintain and update across environments.
+
+If the project grows too much, this might become cumbersome and need to be split into multiple modules, each responsible
+for a specific set of resources or environments. Various solutions and approaches available to address this when it
+relevant.
 
 **Consistent tagging**
 
@@ -67,14 +78,42 @@ Create a minimal app, to demonstrate logging to Cloudwatch logs.
 An example Golang application is used to provide the health endpoint. It receives necessary configuration by reading a
 .env file.
 
-[//]: # (TODO example)
+**Promotion process to `prod`**
 
-- Promotion process.
-    - Option 1: Ansible and Terraform tied
-        - Apply terraform on merge to main. Block deploy until complete.
-        - Deploy latest version to dev account using
+The same Terraform + Ansible code paths apply to `prod`, the only differences are configuration and access
+boundaries. Promotion is therefore additive, not a rewrite:
 
-[//]: # (TODO rollbacks?)
+1. **Bootstrap prod once** (manual, mirrors what `dev` did):
+    - Create a `prod` workspace on the existing state bucket (or a separate bucket in a dedicated prod account if
+      multi-account is later adopted).
+    - Run `terraform/management` with `-workspace prod` to provision the prod GitHub OIDC role, scoped via
+      `sub` claim to `environment:prod` and a protected ruleset (e.g. only `main`).
+    - Create the prod `APP_SECRET` in Secrets Manager via `create-example-secret.sh prod`.
+    - Create `terraform/env/prod.{common,live,backend.*}.{tfvars,hcl}` mirroring the dev shape.
+    - Create a GitHub **`prod` environment** with required reviewers and set `AWS_ROLE_ARN` to the prod role ARN.
+2. **Add prod CI workflows** as clones of `dev-tf-{plan,apply}.yaml` and `deploy-app-dev.yaml` with
+   `environment: prod`, a `concurrency: prod` group, and (stretch) `workflow_dispatch` + required reviewers
+   so apply requires a human approval.
+3. **Promote a release** by merging to `main`: the prod TF apply runs (after approval), then the Ansible workflow
+   redeploys the same binary that dev validated, identified by `GITHUB_SHA`. No code changes — same module, same
+   role, same playbook, different environment + credentials.
+
+This keeps dev and prod logically separate (state path, IAM role, secret namespace, GitHub environment, approval
+gate) without forking modules.
+
+**Rollbacks**
+
+Two independent levers, matching the two halves of the pipeline:
+
+- **Application rollback** — re-run `deploy-app-dev.yaml` (or the prod equivalent) with `workflow_dispatch` and a
+  prior release's `binary_url`. The playbook is idempotent and the ASG is unchanged, so this completes in the time
+  it takes for systemd to swap the binary and restart.
+- **Infrastructure rollback** — revert the offending commit on `main`. The plan/apply pipeline runs the inverse
+  diff. For destructive changes that cannot be cleanly reverted (e.g. a deleted resource), `terraform state` +
+  S3 object versioning on the state bucket provide a recovery path.
+
+The deliberate split (TF for infra, Ansible for app) means an app-level regression never requires touching infra,
+which keeps the blast radius of a rollback small.
 
 **Secret management**
 The sample APP_SECRET value is stored outside source control in a Secrets Manager secret. During deploy, Ansible fetches
@@ -98,7 +137,8 @@ The solution accounts for dynamic EC2 instances in the inventory (at the time of
 using the Ansible AWS dynamic inventory plugin. Access is managed throuhg AWS SSM and appropriately scoped least
 privilege
 
-Private subnets reach the SSM service via a single NAT gateway; an S3 gateway endpoint keeps Ansible's SSM file transfer off the NAT (free, in-VPC).
+Private subnets reach the SSM service via a single NAT gateway; an S3 gateway endpoint keeps Ansible's SSM file transfer
+off the NAT (free, in-VPC).
 
 **CI/CI configuration**
 
@@ -126,30 +166,39 @@ Ruleset rules:
 - Restrict deletions
 - Block force pushes
 
+**Health checks on EC2 instances**
+
+Using `EC2` health checks instead of `NLB` health checks. This is due to the instance being flagged as unhealthy, even
+if it's running fine, yet waiting for Ansible to deploy the application.
+
+Ansible must wait for a GHA deployment to provision the application in the instance. Additionally, if an application
+crashes, it could prevent Ansible being able to SSM connect to the machine to apply a fix. This is an architectural
+constraint to manage OS and app management only with Ansible.
+
+A possible workaround could be to use an init script to potentially read the current deploy version for an environment
+and then provision that release from Github. This doesn't account for 0-1 state when deploying completely new
+infrastructure.
+
 ## Current limitations
 
-Due to the nature of the Ansible based application deployment, if an instance is added or the scaling group churns, the
-application will not automatically be deployed and started on the new instances. In this case, an explicit deployment is
+Due to the nature of the Ansible (triggered from GHA) based application deployment, if an instance is added or the
+scaling group churns, the application will not automatically be deployed and started on the new instances. In this case,
+an explicit deployment is
 required to trigger the application to start.
 
-[//]: # (TODO review this)
 Regardless of the app not runner, the NLB won't route traffic to that instance until the health endpoint is ready, so
-the current solution won't affect unexpected 502 in the context of new instances being added. If there is sufficient
-churn to fully rotate the ec2 instance pool, then there won't be any available instance, in which case there will likely
-be a 502.
+the current solution won't affect unexpected 502 in the context of new instances being added.
 
-## For production
+## Production readiness suggestions
 
-- For general terraform usage, access should be managed via least privilage for production related resources. Less
+- For general terraform usage, access should be managed via least privilege for production-related resources. Less
   practical in a single account configuration and would be more relevant with multi-account.
 - Separate Github assume roles for production deploys. Scope OIDC access to main branch on git repo.
 - Application distributed, even though this was mostly out of scope, would be managed with private repos. For example
   private Github repo, S3 for artifacts, containers in ECR.
 - Use multi AZ NAT gateway.
-
-## Improvements
-
-SSO session for management roles, to avoid hardcoded IAM secrets on machine. Only relevant for local module development.
+- Full audit for IAM constraints and scoped roles for various job functions. Separate terraform plan & apply, separate
+  Ansible deploy roles (scope to valid instances).
 
 ## Appendices
 
@@ -198,6 +247,13 @@ read the secret from secrets managed at the given path, asset the secret has key
 create minimal github actions workflows to:
 1. for PRs verify lint, fmt and run tests
 2. on push to main: build the binary for linux arm64 and publish as github release artifact, use simplified tags for the releases
+verify that the ec2 instances health check for the nlb is using the app_port (and if possible the health_path) to determine if ec2 instances are available for receiving traffic
+```
+
+Asserts check for health endpoint to ensure NLB only route to ready instances:
+
+```
+verify that the ec2 instances health check for the nlb is using the app_port (and if possible the health_path) to determine if ec2 instances are available for receiving traffic
 ```
 
 Add logging for app:
@@ -243,3 +299,32 @@ create a dependency diagram to guide the implementation sequence of this project
 - app deployed: local in ubuntu, secure disk rights, firewall rules,
 - testing access to the nlb
 ```
+
+Ansible playbooks and inventory
+
+```
+for the SSM-based ansible access with dynamic inventory, create a basic reference to run this on github actions, using an oidc role from on github.
+- dynamic inventory confic for ec2 instance with tags environment=dev, service=rewards
+- necessary aws resources, iam roles, etc
+
+ensure playbooks etc are
+reusable for prod aswell without adding unecessary _prod and _dev suffixes. creat the suggested roles and implement items. a secret is created in secrets managed with @terraform/create-example-secret.sh and ec2 iam roles created in live
+and modules, the secret must be read and parsed to add the APP_SECRET value to the final .env, Secret Manager secrets must be read using the ec2 profile role, to profile must have sufficient right (not read directly on github actions, ie.
+ansible controller). resolve the AWS_REGION for the instance using imd2s (also executed on the machine).  the playbook must also read the aws region and add it to the .env
+
+remove the rewards_ prefix which is used everywhere. the service is rewards, though the bulk of the ansible instructions are agnostic and the whole repo is only for this service.
+```
+
+Networking with EC2 instances.
+
+```
+whats the cost impact for adding interface VPC endpoints for ssm, ssmmessages, and ec2messages with private DNS enabled, plus an endpoint security group allowing inbound 443 from the VPC CIDR or app SG. Because this stack also uses Ansible SSM/S3
+transfer, add an S3 gateway endpoint on the private route tables.
+```
+
+For teardown of state bucket
+
+```
+destroy the bucket, regardless if theres objects in it. 
+```
+
