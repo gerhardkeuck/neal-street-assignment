@@ -99,6 +99,18 @@ traffic between load balancers and application servers.
 
 Using a Network Loadbalancer as that can be deployed to a single AZ (compared to ALB).
 
+## Observability
+
+A few basic Cloudwatch metrics with alarms have been configured:
+
+- "Is it up?": when `HealthyHostCount < 1` on the NLB target group.
+- "Is it overloaded?": when the average ASG CPU above `80%` for `10` minutes.
+- Alarms publish to an SNS topic.
+- Email subscription is optional through `alarm_email`.
+
+A CloudWatch log group exists as a placeholder for future centralized logs. The current implementation does not
+install/configure the CloudWatch agent by default (uncomplete).
+
 ### Minimal app
 
 Created a minimal app to demonstrate:
