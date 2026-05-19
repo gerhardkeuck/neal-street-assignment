@@ -233,7 +233,9 @@ ideally a more formal release tag), for
 example `rewards-a1b2c3d`, and deploys it to `dev`. To promote to prod, an operator supplies the desired release tag or
 commit SHA. The workflow verifies that the commit is reachable from `main`, that the corresponding GitHub release
 artifact
-exists, and *optionally* that `dev` is currently serving the same commit from /health.
+exists, and *optionally* that `dev` is currently serving the same commit from /health (although this would cause strong
+coupling between the two environments, a more strongly promotion with something like [Kargo](https://kargo.io/) would
+solve this).
 
 After validation, the workflow runs a prod Terraform plan using prod state and variables, publishes the plan for review,
 then applies the exact reviewed plan after manual approval. Using concurrency gates to prevent unexpected changes. A
@@ -242,7 +244,17 @@ artifact. A final smoke test checks the prod load balancer /health endpoint and 
 expected commit hash. This keeps `dev` continuous while allowing only explicitly selected, already-validated versions
 to reach prod, with separate prod credentials, approval gates, and non-overlapping prod runs.
 
+Use multiple environments to enforce gates between changes on prod: terraform plan, terraform apply, dev deploy. This
+ensures changes are reviewed before rollout.
+
 ## Current limitations
+
+### No real orchestration
+
+This solution has several major flaws that stem from deployments exclusively managed from GHA with Ansible and does not
+include automated reconciliation procedures.
+- ASG scale changes has concurrency risk with Ansible to not deploy the app.
+- If ansible executes before SSM agent ready, that instances will fail the deployment.
 
 ### Unprovisioned EC2 instances on scale
 
