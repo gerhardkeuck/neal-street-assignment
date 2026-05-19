@@ -1,5 +1,29 @@
 # Solution
 
+## Architecture overview
+
+Public traffic enters through a single NLB and reaches a private ASG of EC2 instances that serve the JSON
+health endpoint. Operators connect over SSM (no SSH, no public IPs). The application reads its secret from
+Secrets Manager via the instance profile, so no credentials are exchanged through Ansible or CI. Two
+CloudWatch alarms cover the brief's observability questions: `HealthyHostCount < 1` ("is it up?") and ASG
+`CPUUtilization > 80%` ("is it overloaded?").
+
+```mermaid
+flowchart LR
+  user([Internet]) -->|HTTP :80| nlb[NLB<br/>public subnets]
+  nlb -->|TCP :8080| asg[ASG / EC2<br/>private subnets]
+  asg -->|GET /health 200| nlb
+  asg -.SSM session.-> ssm[SSM]
+  ssm -.file transfer.-> s3[(S3 gateway<br/>endpoint)]
+  asg -->|read APP_SECRET| sm[(Secrets Manager)]
+  asg -->|egress via| nat[NAT GW]
+  asg -->|metrics| cw[(CloudWatch<br/>alarms + SNS)]
+```
+
+Delivery model: a PR runs `terraform plan` and posts the diff; merging `main` fans out to
+`dev-tf-apply` (infra) and `deploy-app-dev` (Ansible over SSM) in parallel, each gated by its own
+`environment: dev` and OIDC role.
+
 ## Tasks breakdown order
 
 High level task sequence breakdown, accounting for dependencies between tasks:
