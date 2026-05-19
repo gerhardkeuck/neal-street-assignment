@@ -30,7 +30,7 @@ rewards_secret_name: "/{{ rewards_environment }}/{{ rewards_service }}/config"
 rewards_secret_app_key: APP_SECRET
 
 # Arbitrary extra KEY=VALUE pairs rendered into the env file.
-rewards_extra_env: {}
+rewards_extra_env: { }
 
 # Optional features.
 rewards_install_cloudwatch_agent: false

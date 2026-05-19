@@ -21,7 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
-    - uses: aws-actions/configure-aws-credentials@v4
+    - uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ vars.AWS_ROLE_ARN }}
         aws-region: eu-west-1
@@ -101,6 +101,10 @@ jobs:
               issue_number: context.issue.number, body,
             });
           }
+
+    - name: Fail if fmt errored
+      if: steps.fmt.outcome == 'failure'
+      run: exit 1
 
     - name: Fail if plan errored
       if: steps.plan.outcome == 'failure'
