@@ -19,7 +19,7 @@ rewards_app_port: 8080
 # Release artifact. Required — pass via group_vars, inventory, or extra-vars.
 # Example: https://github.com/<org>/<repo>/releases/download/v1.2.3/rewards-linux-arm64
 rewards_binary_url: ""
-rewards_binary_checksum: ""   # optional, e.g. "sha256:abc..."
+rewards_binary_checksum: "" # optional, e.g. "sha256:abc..."
 
 # Commit hash surfaced by the app's health endpoint. Pass via --extra-vars or CI.
 rewards_commit_hash: ""
@@ -30,8 +30,7 @@ rewards_secret_name: "/{{ rewards_environment }}/{{ rewards_service }}/config"
 rewards_secret_app_key: APP_SECRET
 
 # Arbitrary extra KEY=VALUE pairs rendered into the env file.
-rewards_extra_env: { }
-
+rewards_extra_env: {}
 # Optional features.
 rewards_install_cloudwatch_agent: false
 rewards_unattended_upgrades_enabled: true

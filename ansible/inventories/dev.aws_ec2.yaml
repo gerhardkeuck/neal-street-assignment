@@ -5,7 +5,7 @@
 plugin: amazon.aws.aws_ec2
 
 regions:
-- eu-west-1
+  - eu-west-1
 
 filters:
   tag:service: rewards
@@ -13,7 +13,7 @@ filters:
   instance-state-name: running
 
 hostnames:
-- instance-id
+  - instance-id
 
 # Run over SSM so we don't need SSH or public IPs.
 # Per-host facts are composed from instance tags so the role stays env-neutral.

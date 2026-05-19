@@ -7,8 +7,8 @@
     group: root
     mode: "0644"
   notify:
-  - rewards_systemd_reload
-  - rewards_restart
+    - rewards_systemd_reload
+    - rewards_restart
 
 - name: Enable and start rewards service
   ansible.builtin.systemd:
