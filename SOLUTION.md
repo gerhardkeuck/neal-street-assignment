@@ -2,11 +2,9 @@
 
 ## Tasks breakdown order
 
-[//]: # (TODO capture logical sequence of tasks)
-
 High level task sequence breakdown, accounting for dependencies between tasks:
 
-- Create minimal Go app to expose endpoint and generated logs
+- Create a minimal Go app to expose endpoint and generated logs
 - GHA for go app: Test, build and release on Github Actions.
 - Create terraform backend bootstrap.
 - Create `managed` resources, for GHA to use Ansible and Terraform.
@@ -16,16 +14,20 @@ High level task sequence breakdown, accounting for dependencies between tasks:
 - Create Ansible playbook/roles/inventory for deploying from GitHub to EC2 group.
 - Configure logging with Cloudwatch logs.
 - Teardown steps.
-- Smoke test solution during and afterwards.
+- Smoke test solution during and afterward.
 
 Continuously update README.md and SOLUTION.md while progressing.
+
+## High level architecture
+
+[//]: # (TODO add mermaid architecture diagram, after finalising everything else)
 
 ## Reasoning for decisions
 
 This project quite a white scope of decisions that had to be taken into account to deliver the solution within the
 project constraints. Here the high level reasons for choices are explained.
 
-**Terraform state handling approach**
+### Terraform state handling approach
 
 State is stored remotely in an S3 backend with native S3 locking (one lockfile per state object) and bucket
 versioning + default encryption enabled. The bucket is created once by `terraform/bootstrap-backend.sh` to break the
@@ -41,7 +43,7 @@ Trade-offs vs. the alternatives, in the context of a small team:
     - Pros: zero cost, no extra vendor, runs are on GitHub Actions.
     - Cons: no managed run UI, no built-in policy/cost gates (acceptable at this size).
 
-**Multiple Terraform projects**
+### Multiple Terraform projects
 
 There are two parts for the Terraform solution:
 
@@ -50,7 +52,7 @@ There are two parts for the Terraform solution:
 - The `live` module provisions infrastructure for the `dev` (and `prod` if vars are defined) environments. This module
   can be fully managed through git PRs.
 
-**Single module for live environments**
+### Single module for live environments
 
 The `live` module is designed to be a single module for managing infrastructure across multiple environments. This
 approach simplifies the management of infrastructure by consolidating the configuration and state
@@ -60,87 +62,80 @@ If the project grows too much, this might become cumbersome and need to be split
 for a specific set of resources or environments. Various solutions and approaches available to address this when it
 relevant.
 
-**Consistent tagging**
+### Consistent AWS tagging
 
 Defaults for tags are defined on the AWS provider to ensure all resources that support tags include those tags.
+Additional tag definition were added to launch template to ensure on demand instances also contain the correct tags.
 
-**Networking**
-A VPC is created per environment, ensuring no shared routing between `dev` and `prod` environments.
+### Networking
+
+A VPC is created per environment, ensuring no shared routing between `dev` and `prod` environments by default.
 Separate Public and Private subnets are used to separate traffic between public ingress for load balancers and private
 traffic between load balancers and application servers.
 
 Using a Network Loadbalancer as that can be deployed to a single AZ (compared to ALB).
 
-**Example app**
+### Minimal app
 
-Create a minimal app, to demonstrate logging to Cloudwatch logs.
+Created a minimal app to demonstrate:
 
-An example Golang application is used to provide the health endpoint. It receives necessary configuration by reading a
-.env file.
+- exposing the health endpoint
+- consuming a secret (in combination with Ansible).
+- logging to Cloudwatch logs
 
-**Promotion process to `prod`**
+An example Golang application is used to provide the health endpoint. It receives the necessary configuration by reading
+an.env file.
 
-The same Terraform + Ansible code paths apply to `prod`, the only differences are configuration and access
-boundaries. Promotion is therefore additive, not a rewrite:
+#### Secret management
 
-1. **Bootstrap prod once** (manual, mirrors what `dev` did):
-    - Create a `prod` workspace on the existing state bucket (or a separate bucket in a dedicated prod account if
-      multi-account is later adopted).
-    - Run `terraform/management` with `-workspace prod` to provision the prod GitHub OIDC role, scoped via
-      `sub` claim to `environment:prod` and a protected ruleset (e.g. only `main`).
-    - Create the prod `APP_SECRET` in Secrets Manager via `create-example-secret.sh prod`.
-    - Create `terraform/env/prod.{common,live,backend.*}.{tfvars,hcl}` mirroring the dev shape.
-    - Create a GitHub **`prod` environment** with required reviewers and set `AWS_ROLE_ARN` to the prod role ARN.
-2. **Add prod CI workflows** as clones of `dev-tf-{plan,apply}.yaml` and `deploy-app-dev.yaml` with
-   `environment: prod`, a `concurrency: prod` group, and (stretch) `workflow_dispatch` + required reviewers
-   so apply requires a human approval.
-3. **Promote a release** by merging to `main`: the prod TF apply runs (after approval), then the Ansible workflow
-   redeploys the same binary that dev validated, identified by `GITHUB_SHA`. No code changes — same module, same
-   role, same playbook, different environment + credentials.
+Ansible reads the secret from Secrets Manager. This could be managed natively in th Go app to reduce secret storage on
+disk. Used ansible to keep as much management as part of Ansible.
 
-This keeps dev and prod logically separate (state path, IAM role, secret namespace, GitHub environment, approval
-gate) without forking modules.
-
-**Rollbacks**
+### Rollbacks
 
 Two independent levers, matching the two halves of the pipeline:
 
-- **Application rollback** — re-run `deploy-app-dev.yaml` (or the prod equivalent) with `workflow_dispatch` and a
+- **Application rollback**: re-run `deploy-app-dev.yaml` (or the prod equivalent) with `workflow_dispatch` and a
   prior release's `binary_url`. The playbook is idempotent and the ASG is unchanged, so this completes in the time
   it takes for systemd to swap the binary and restart.
 - **Infrastructure rollback** — revert the offending commit on `main`. The plan/apply pipeline runs the inverse
   diff. For destructive changes that cannot be cleanly reverted (e.g. a deleted resource), `terraform state` +
   S3 object versioning on the state bucket provide a recovery path.
 
+As infrastructure changes could be more complex, the general rule of fail forward should be followed.
+
 The deliberate split (TF for infra, Ansible for app) means an app-level regression never requires touching infra,
 which keeps the blast radius of a rollback small.
 
-**Secret management**
+### Secret management
+
 The sample APP_SECRET value is stored outside source control in a Secrets Manager secret. During deploy, Ansible fetches
-the secret using the SSM session and renders it into /etc/rewards/app.env.
+the secret using the EC2 instance profile and renders it into /etc/rewards/app.env.
 Secret-handling tasks use no_log: true to avoid leaking values into CI logs. This keeps secrets out of the
 repository, while accepting the operational trade-off that the secret exists on disk on the instance.
 
-For this project I chose rendering the secrets with Ansible, though in practice I would
-prefer to retrieve secrets directly from AWS Secrets Manager. This limits secret persistence to disk en ensure secrets
-will not be visible to Ansible logs or other deployment related runners.
+For this project I chose rendering the secrets with Ansible, though in practice I would prefer to retrieve secrets
+directly from AWS Secrets Manager. This limits secret persistence to disk en ensure secrets will not be visible to
+Ansible logs or other deployment related runners.
 
-**Structing modules between environments**
+### Modules between environments
+
 For this assignment a single AWS account was used, given the assignment constraints. Only the `dev` environment has been
-provisioned. In a production rollout, I would promote the same Terraform/Ansible pattern into a
-separate prod AWS account, using a distinct Terraform backend/state path, separate GitHub OIDC IAM role, separate secret
+provisioned. In a production rollout, I would promote the same Terraform/Ansible pattern into a separate prod AWS
+account, using a distinct Terraform backend/state path, separate GitHub OIDC IAM role, separate secret
 namespace, and manual approval before apply. This keeps blast radius, credentials, and audit boundaries separate without
-adding unnecessary complexity to the dev exercise.
+adding unnecessary complexity to the `dev` workflows.
 
-**Ansible EC2 authentication and management**
+### Ansible EC2 authentication and management
+
 The solution accounts for dynamic EC2 instances in the inventory (at the time of deploy). This is achieved through by
-using the Ansible AWS dynamic inventory plugin. Access is managed throuhg AWS SSM and appropriately scoped least
-privilege
+using the Ansible AWS dynamic inventory plugin. Access is managed throuhg AWS SSM and appropriately scoped
+least-privilege
 
 Private subnets reach the SSM service via a single NAT gateway; an S3 gateway endpoint keeps Ansible's SSM file transfer
 off the NAT (free, in-VPC).
 
-**CI/CI configuration**
+### CI/CI configuration
 
 This project uses Github and Github Actions for managing CI/CD piplines. This was chosen for the following reasons:
 
@@ -152,21 +147,21 @@ This project uses Github and Github Actions for managing CI/CD piplines. This wa
 Ansible remotely connects using AWS SSM to all EC2 instances for a given environment and service (at that point in
 time). The instances are discovered using the Ansible dynamic inventory plugin.
 
-**Enforce GitHub PRs**
+### Enforce GitHub PRs
 
-Created a GitHub ruleset to protec the `main` branch. This PRs must always be used and required checks will always be
-executed.
+Created a GitHub ruleset to protect the `main` branch. This requires that PRs must always be used and required checks
+will always be executed.
 
 Ruleset rules:
 
-- Target branch: default
+- Target branch: default (ie. `main`)
 - Require a pull request before merging
 - Require status checks to pass
 - Require linear history
 - Restrict deletions
 - Block force pushes
 
-**Health checks on EC2 instances**
+### Health checks on EC2 instances
 
 Using `EC2` health checks instead of `NLB` health checks. This is due to the instance being flagged as unhealthy, even
 if it's running fine, yet waiting for Ansible to deploy the application.
@@ -177,23 +172,55 @@ constraint to manage OS and app management only with Ansible.
 
 A possible workaround could be to use an init script to potentially read the current deploy version for an environment
 and then provision that release from Github. This doesn't account for 0-1 state when deploying completely new
-infrastructure.
+infrastructure, so this solution would be error-prone by default.
+
+## Proposed promotion process to production
+
+The same Terraform + Ansible code paths apply to `prod`, the only differences are configuration and access
+boundaries.:
+
+### Bootstrap prod (manual, mirrors what `dev`)
+
+- Run `terraform/management` with workspace `prod` to provision the prod GitHub OIDC role.
+- Create the prod `APP_SECRET` in Secrets Manager via `create-example-secret.sh prod`.
+- Create `terraform/env/prod.{common,live,backend.*}.{tfvars,hcl}` mirroring the dev shape.
+- Create a GitHub **`prod` environment** with required reviewers and set `AWS_ROLE_ARN` to the prod role ARN.
+
+This keeps dev and prod logically separate (state path, IAM role, secret namespace, GitHub environment, approval
+gate) without forking modules.
+
+### Github workflows
+
+Production would be promoted manually using a GitHub Actions `workflow_dispatch` workflow rather than automatically on
+every merge to `main`. Each merge to `main` builds an immutable release artifact tagged with the application commit (or
+ideally a more formal release tag), for
+example `rewards-a1b2c3d`, and deploys it to `dev`. To promote to prod, an operator supplies the desired release tag or
+commit SHA. The workflow verifies that the commit is reachable from `main`, that the corresponding GitHub release
+artifact
+exists, and *optionally* that `dev` is currently serving the same commit from /health.
+
+After validation, the workflow runs a prod Terraform plan using prod state and variables, publishes the plan for review,
+then applies the exact reviewed plan after manual approval. Using concurrency gates to prevent unexpected changes. A
+separate approved deployment step runs Ansible against the prod dynamic inventory and installs the selected release
+artifact. A final smoke test checks the prod load balancer /health endpoint and asserts both status == "ok" and the
+expected commit hash. This keeps `dev` continuous while allowing only explicitly selected, already-validated versions
+to reach prod, with separate prod credentials, approval gates, and non-overlapping prod runs.
 
 ## Current limitations
 
+### Unprovisioned EC2 instances on scale
+
 Due to the nature of the Ansible (triggered from GHA) based application deployment, if an instance is added or the
 scaling group churns, the application will not automatically be deployed and started on the new instances. In this case,
-an explicit deployment is
-required to trigger the application to start.
-
-Regardless of the app not runner, the NLB won't route traffic to that instance until the health endpoint is ready, so
-the current solution won't affect unexpected 502 in the context of new instances being added.
+an explicit deployment is required to trigger the application to start. This could be addressed with System Manager (
+see [here](https://aws.amazon.com/blogs/mt/running-ansible-playbooks-using-ec2-systems-manager-run-command-and-state-manager/)),
+although this removes status checks on Github, given the asynchronous nature.
 
 ## Production readiness suggestions
 
-- For general terraform usage, access should be managed via least privilege for production-related resources. Less
+- For general terraform usage, access should be managed via a least privilege for production-related resources. Less
   practical in a single account configuration and would be more relevant with multi-account.
-- Separate Github assume roles for production deploys. Scope OIDC access to main branch on git repo.
+- Separate Github assume roles for production deploys. Scope OIDC access to the main branch on git repo.
 - Application distributed, even though this was mostly out of scope, would be managed with private repos. For example
   private Github repo, S3 for artifacts, containers in ECR.
 - Use multi AZ NAT gateway.
@@ -320,6 +347,19 @@ Networking with EC2 instances.
 ```
 whats the cost impact for adding interface VPC endpoints for ssm, ssmmessages, and ec2messages with private DNS enabled, plus an endpoint security group allowing inbound 443 from the VPC CIDR or app SG. Because this stack also uses Ansible SSM/S3
 transfer, add an S3 gateway endpoint on the private route tables.
+```
+
+Finding gaps:
+
+```
+review the @neal_street_assignment_dump.md  .github/workflows and the ansible and terraform implementaiton, review a gap analysis of the dev deployment process and prompose a well structure prod promotion procedude, which ensure: dev was
+  deployed for that version, terraform plan, apply and ansible deploy to prod requires manual approvals. for this project, should ansible and terraform be tied to a single sequential repo? terraform apply should execute before ansible deploy
+```
+
+Fix workflow concurrency:
+
+```
+suggest consolidated tf and ansible workflows per env, ensuring tf is applied succesfully first before ansible applies. account for at least 1 ec2 instance to be available.
 ```
 
 For teardown of state bucket
