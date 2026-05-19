@@ -42,10 +42,6 @@ High level task sequence breakdown, accounting for dependencies between tasks:
 
 Continuously update README.md and SOLUTION.md while progressing.
 
-## High level architecture
-
-[//]: # (TODO add mermaid architecture diagram, after finalising everything else)
-
 ## Reasoning for decisions
 
 This project quite a white scope of decisions that had to be taken into account to deliver the solution within the
