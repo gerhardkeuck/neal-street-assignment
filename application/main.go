@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,14 +18,21 @@ func main() {
 	_ = godotenv.Load()
 
 	commit := mustEnv("COMMIT_HASH")
+	service := mustEnv("SERVICE")
 	region := mustEnv("REGION")
-	addr := os.Getenv("ADDR")
-	if addr == "" {
-		addr = ":8080"
+	environment := mustEnv("ENVIRONMENT")
+	app_secret := os.Getenv("APP_SECRET")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	port = fmt.Sprintf(":%s", port)
+	if app_secret != "" {
+		slog.Info("loaded a secret.")
 	}
 
-	logger.Info("starting rewards service", "addr", addr, "commit", commit, "region", region)
-	if err := router(commit, region).Run(addr); err != nil {
+	logger.Info("starting rewards service", "service", service, "port", port, "environment", environment, "commit", commit, "region", region)
+	if err := router(service, commit, region).Run(port); err != nil {
 		logger.Error("rewards service stopped", "error", err)
 		os.Exit(1)
 	}
@@ -39,7 +47,7 @@ func mustEnv(key string) string {
 	return value
 }
 
-func router(commit, region string) *gin.Engine {
+func router(service, commit, region string) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.New()
@@ -47,7 +55,7 @@ func router(commit, region string) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"service": "rewards",
+			"service": service,
 			"status":  "ok",
 			"commit":  commit,
 			"region":  region,
