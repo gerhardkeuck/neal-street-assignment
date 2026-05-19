@@ -10,14 +10,14 @@ CloudWatch alarms cover the brief's observability questions: `HealthyHostCount <
 
 ```mermaid
 flowchart LR
-  user([Internet]) -->|HTTP :80| nlb[NLB<br/>public subnets]
-  nlb -->|TCP :8080| asg[ASG / EC2<br/>private subnets]
-  asg -->|GET /health 200| nlb
-  asg -.SSM session.-> ssm[SSM]
-  ssm -.file transfer.-> s3[(S3 gateway<br/>endpoint)]
-  asg -->|read APP_SECRET| sm[(Secrets Manager)]
-  asg -->|egress via| nat[NAT GW]
-  asg -->|metrics| cw[(CloudWatch<br/>alarms + SNS)]
+     user([Internet]) -->|HTTP :80| nlb[NLB<br/>public subnets]
+    nlb -->|TCP :8080| asg[ASG / EC2<br/>private subnets]
+    asg -->|GET /health 200| nlb
+    asg -. SSM session .-> ssm[SSM]
+    ssm -. file transfer .-> s3[(S3 gateway<br/>endpoint)]
+    asg -->|read APP_SECRET| sm[(Secrets Manager)]
+    asg -->|egress via| nat[NAT GW]
+    asg -->|metrics| cw[(CloudWatch<br/>alarms + SNS)]
 ```
 
 Delivery model: a PR runs `terraform plan` and posts the diff; merging `main` fans out to
