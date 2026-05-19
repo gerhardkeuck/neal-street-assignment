@@ -1,5 +1,11 @@
 # Solution
 
+## Quick inspect links
+
+- Repository: https://github.com/gerhardkeuck/neal-street-assignment
+- Cloudwatch metrics overview: https://eu-west-1.console.aws.amazon.com/cloudwatch/home?region=eu-west-1
+- Deployed endpoint: [rewards-dev-nlb-931cf46fa8a045c7.elb.eu-west-1.amazonaws.com/health](http://rewards-dev-nlb-931cf46fa8a045c7.elb.eu-west-1.amazonaws.com/health)
+
 ## Architecture overview
 
 Public traffic enters through a single NLB and reaches a private ASG of EC2 instances that serve the JSON
@@ -10,7 +16,7 @@ CloudWatch alarms cover the brief's observability questions: `HealthyHostCount <
 
 ```mermaid
 flowchart LR
-     user([Internet]) -->|HTTP :80| nlb[NLB<br/>public subnets]
+    user([Internet]) -->|HTTP :80| nlb[NLB<br/>public subnets]
     nlb -->|TCP :8080| asg[ASG / EC2<br/>private subnets]
     asg -->|GET /health 200| nlb
     asg -. SSM session .-> ssm[SSM]
@@ -270,6 +276,11 @@ The current monorepo approach tighty couples releases between releases for appli
 Secrets still travel to GHA as Ansible registers the variable, needed to render the `.env`. Reading secrets directly in
 the application would mitigate this.
 
+### Always deploys the latest Go binary
+
+The latest binary is always used. This focus in not on app change management for now, so this oversight has been left
+as for a future improvement.
+
 ## Production readiness suggestions
 
 - For general terraform usage, access should be managed via a least privilege for production-related resources. Less
@@ -290,6 +301,8 @@ the application would mitigate this.
   bucket ([S3 Bucket Permissions](https://developer.hashicorp.com/terraform/language/backend/s3#s3-bucket-permissions))
 
 ### LLM Prompts used
+
+> Note: this list is not comprehensive.
 
 With pure Terraform (ie. without Terragrunt) the state backend needs to be manually provisioned in advance (or created
 from another Terraform project/account). Used in `setup-state-backend.sh`:
