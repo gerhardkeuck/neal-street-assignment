@@ -2,9 +2,9 @@
 - name: Validate required role inputs
   ansible.builtin.assert:
     that:
-    - rewards_binary_url | length > 0
-    - rewards_secret_name | length > 0
-    - rewards_environment | length > 0
+      - rewards_binary_url | length > 0
+      - rewards_secret_name | length > 0
+      - rewards_environment | length > 0
     fail_msg: >-
       rewards_binary_url, rewards_secret_name and rewards_environment must all
       be set (typically via inventory group_vars or instance tags).

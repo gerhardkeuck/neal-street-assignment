@@ -26,17 +26,17 @@
   # `aws-cli` here uses the EC2 instance profile via IMDS — no static creds.
   ansible.builtin.command:
     argv:
-    - aws
-    - secretsmanager
-    - get-secret-value
-    - --region
-    - "{{ rewards_aws_region }}"
-    - --secret-id
-    - "{{ rewards_secret_name }}"
-    - --query
-    - SecretString
-    - --output
-    - text
+      - aws
+      - secretsmanager
+      - get-secret-value
+      - --region
+      - "{{ rewards_aws_region }}"
+      - --secret-id
+      - "{{ rewards_secret_name }}"
+      - --query
+      - SecretString
+      - --output
+      - text
   register: rewards_secret_raw
   changed_when: false
   check_mode: false
@@ -50,7 +50,7 @@
 - name: Assert APP_SECRET key is present
   ansible.builtin.assert:
     that:
-    - rewards_secret_app_key in rewards_secret_doc
+      - rewards_secret_app_key in rewards_secret_doc
     fail_msg: "Secret '{{ rewards_secret_name }}' has no key '{{ rewards_secret_app_key }}'"
 
 - name: Render rewards.env

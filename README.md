@@ -26,7 +26,7 @@ credentials live in the repo or in CI secrets.
 ### Install Required Tools
 
 - terraform (≥ 1.10, required for native S3 state locking)
-- ansible
+- ansible and ansible-lint
 - Go SDK (only needed to build the app locally)
 - AWS CLI v2 with the [Session Manager plugin]
 
@@ -169,6 +169,12 @@ ansible-playbook  -i inventories/dev.aws_ec2.yaml playbooks/deploy.yaml \
 > profile. CI uses a scoped role, not admin.
 
 [Session Manager plugin]: https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+
+**Format Ansible before committing**
+```shell
+cd ansible
+ansible-lint --fix
+```
 
 ### Example app
 

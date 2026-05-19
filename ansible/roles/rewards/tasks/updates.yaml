@@ -9,9 +9,9 @@
     line: "{{ item.line }}"
     state: present
   loop:
-  - { regexp: '^upgrade_type\s*=', line: 'upgrade_type = security' }
-  - { regexp: '^apply_updates\s*=', line: 'apply_updates = yes' }
-  - { regexp: '^download_updates\s*=', line: 'download_updates = yes' }
+    - { regexp: "^upgrade_type\\s*=", line: "upgrade_type = security" }
+    - { regexp: "^apply_updates\\s*=", line: "apply_updates = yes" }
+    - { regexp: "^download_updates\\s*=", line: "download_updates = yes" }
 
 - name: Enable dnf-automatic timer
   ansible.builtin.systemd:
