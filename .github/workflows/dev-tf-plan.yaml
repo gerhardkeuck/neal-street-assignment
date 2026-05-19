@@ -102,6 +102,10 @@ jobs:
             });
           }
 
+    - name: Fail if fmt errored
+      if: steps.fmt.outcome == 'failure'
+      run: exit 1
+
     - name: Fail if plan errored
       if: steps.plan.outcome == 'failure'
       run: exit 1
