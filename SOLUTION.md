@@ -253,6 +253,7 @@ ensures changes are reviewed before rollout.
 
 This solution has several major flaws that stem from deployments exclusively managed from GHA with Ansible and does not
 include automated reconciliation procedures.
+
 - ASG scale changes has concurrency risk with Ansible to not deploy the app.
 - If ansible executes before SSM agent ready, that instances will fail the deployment.
 
@@ -263,6 +264,15 @@ scaling group churns, the application will not automatically be deployed and sta
 an explicit deployment is required to trigger the application to start. This could be addressed with System Manager (
 see [here](https://aws.amazon.com/blogs/mt/running-ansible-playbooks-using-ec2-systems-manager-run-command-and-state-manager/)),
 although this removes status checks on Github, given the asynchronous nature.
+
+### Coupling between application and infrastructure management
+
+The current monorepo approach tighty couples releases between releases for applications, infrastructure changes and
+
+### Secrets exposure
+
+Secrets still travel to GHA as Ansible registers the variable, needed to render the `.env`. Reading secrets directly in
+the application would mitigate this.
 
 ## Production readiness suggestions
 
