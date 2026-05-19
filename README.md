@@ -8,6 +8,19 @@ the following parts:
 2. **ansible:** Ansible resources for application deployment and configuration.
 3. **.github/workflows**: CI/CD workflows for validating/building/release/deploying changes.
 
+## CI/CD flow
+
+- **PR to `main`**: `Dev Plan Terraform` runs `fmt` + `validate` + `plan` and posts a sticky comment with
+  the diff; `Verify App` runs Go fmt/vet/test/build; `Ansible Lint` checks the role.
+- **Merge to `main`**: `Dev Apply Terraform` applies infra; `Dev Deploy App` runs the Ansible playbook
+  over SSM against whatever EC2 the dynamic inventory finds; `Build App Release` publishes a tagged GitHub
+  Release with the linux-arm64 binary.
+- **Manual**: `Dev Deploy App` accepts `workflow_dispatch` with an explicit `binary_url`, which is the
+  primary rollback lever.
+
+All AWS calls use GitHub OIDC against the role provisioned by `terraform/management`, no static
+credentials live in the repo or in CI secrets.
+
 ## Setup
 
 ### Install Required Tools
